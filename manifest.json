@@ -31,6 +31,7 @@
     "https://data-api.polymarket.com/*",
     "https://api.binance.com/*",
     "https://api.coingecko.com/*",
+    "https://cryptopanic.com/*",
     "https://api-football-v1.p.rapidapi.com/*",
     "https://v3.football.api-sports.io/*"
   ],
