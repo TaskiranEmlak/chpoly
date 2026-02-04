@@ -306,9 +306,89 @@ class NotificationManager {
     }
 }
 
+// === WHALE SCANNER ===
+
+class WhaleScanner {
+    constructor() {
+        this.dataApiUrl = 'https://data-api.polymarket.com';
+        this.activeMarkets = new Set(); // ID'leri tut
+        this.lastAlerts = new Map(); // Son uyarı zamanları
+        this.threshold = 10000; // $10,000 üzeri işlemler
+    }
+
+    start(interval = 60000) {
+        console.log('🐋 Whale scanner başlatıldı...');
+        this.intervalId = setInterval(() => this.scan(), interval);
+        this.scan(); // İlk tarama
+    }
+
+    stop() {
+        if (this.intervalId) clearInterval(this.intervalId);
+    }
+
+    async scan() {
+        // MarketScanner'dan aktif marketleri al
+        if (!marketScanner || !marketScanner.lastMarkets) return;
+
+        const markets = marketScanner.lastMarkets;
+        for (const market of markets) {
+            await this.checkMarket(market);
+        }
+    }
+
+    async checkMarket(market) {
+        try {
+            // Data API'den pozisyonları çek
+            const response = await fetch(`${this.dataApiUrl}/markets/${market.id}/positions?limit=20&orderBy=shares&order=desc`);
+            if (!response.ok) return;
+
+            const positions = await response.json();
+
+            for (const pos of positions) {
+                const value = (pos.shares || 0) * (pos.price || 0.5); // Yaklaşık değer
+
+                if (value >= this.threshold) {
+                    this.processWhalePosition(market, pos, value);
+                }
+            }
+        } catch (error) {
+            console.error('Whale scan error:', error);
+        }
+    }
+
+    processWhalePosition(market, pos, value) {
+        const key = `${market.id}_${pos.proxyWallet}_${pos.outcome}`;
+        const lastAlert = this.lastAlerts.get(key);
+
+        // 1 saat içinde aynı pozisyon için tekrar uyarı verme
+        if (lastAlert && Date.now() - lastAlert < 3600000) return;
+
+        this.lastAlerts.set(key, Date.now());
+
+        const signal = {
+            type: 'WHALE_ALERT',
+            market: market,
+            action: pos.outcome === 'Yes' ? 'YES' : 'NO',
+            confidence: 90, // Balina işlemi önemlidir
+            urgency: value > 50000 ? 'CRITICAL' : 'HIGH',
+            currentPrice: value, // Burada işlem hacmini gösteriyoruz
+            strikePrice: market.strikePrice,
+            gapPercent: 0,
+            timeRemaining: Math.round((market.endTime - Date.now()) / 1000),
+            timestamp: Date.now(),
+            reason: `🐋 BALİNA ALARMI: $${value.toLocaleString()} pozisyon!`
+        };
+
+        if (notificationManager) {
+            notificationManager.sendSignal(signal);
+        }
+    }
+}
+
 // === INITIALIZE ===
 
 marketScanner = new MarketScanner();
+whaleScanner = new WhaleScanner(); // Yeni scanner
 notificationManager = new NotificationManager();
 
 marketScanner.onSignal = (signal) => {
@@ -332,9 +412,11 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     if (message.type === 'TOGGLE_SCANNER') {
         if (message.enabled) {
             marketScanner.start(10000);
+            whaleScanner.start(60000); // Balina taraması 1dk
             scannerEnabled = true;
         } else {
             marketScanner.stop();
+            whaleScanner.stop();
             scannerEnabled = false;
             chrome.action.setBadgeText({ text: '' });
         }
@@ -384,8 +466,9 @@ chrome.storage.local.get('autoScan', (data) => {
     if (data.autoScan) {
         console.log('🔄 Auto-scan aktif, başlatılıyor...');
         marketScanner.start(10000);
+        whaleScanner.start(60000);
         scannerEnabled = true;
     }
 });
 
-console.log('✅ Background service hazır');
+console.log('✅ Background service hazır (v2.1 Pro)');
