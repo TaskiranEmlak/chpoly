@@ -661,8 +661,12 @@ async function startAlarmScanning() {
 
     scannerEnabled = true;
 
-    // İlk taramayı hemen yap
-    marketScanner.scan();
+    // İlk taramayı hemen yap (hata olursa yakalanır)
+    try {
+        await marketScanner.scan();
+    } catch (e) {
+        console.error('İlk tarama hatası:', e);
+    }
 
     // Durumu kaydet
     await chrome.storage.local.set({ autoScan: true });

@@ -199,15 +199,28 @@ function setupEventListeners() {
   // Scanner Listeners
   elements.autoScanToggle?.addEventListener('change', async (e) => {
     const enabled = e.target.checked;
-    await chrome.storage.local.set({ autoScan: enabled });
+    console.log('🔄 Scanner toggle:', enabled);
 
-    // Background'a bildir
-    chrome.runtime.sendMessage({
-      type: 'TOGGLE_SCANNER',
-      enabled: enabled
-    }, (response) => {
-      updateScannerStatus(response?.enabled || false);
-    });
+    try {
+      await chrome.storage.local.set({ autoScan: enabled });
+
+      // Background'a bildir
+      chrome.runtime.sendMessage({
+        type: 'TOGGLE_SCANNER',
+        enabled: enabled
+      }, (response) => {
+        if (chrome.runtime.lastError) {
+          console.error('Toggle error:', chrome.runtime.lastError);
+          updateScannerStatus(enabled); // Yine de UI'ı güncelle
+          return;
+        }
+        console.log('✅ Toggle response:', response);
+        updateScannerStatus(response?.enabled ?? enabled);
+      });
+    } catch (err) {
+      console.error('Toggle exception:', err);
+      updateScannerStatus(enabled);
+    }
   });
 
   elements.openSignalBtn?.addEventListener('click', async () => {
