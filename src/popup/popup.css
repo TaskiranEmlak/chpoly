@@ -1243,6 +1243,80 @@ input:checked+.slider:before {
   color: var(--danger);
 }
 
+/* Quick Trade Section */
+.quick-trade-section {
+  margin-top: var(--space-md);
+  padding: var(--space-md);
+  background: linear-gradient(135deg, rgba(16, 185, 129, 0.1), rgba(59, 130, 246, 0.1));
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+}
+
+.quick-trade-header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  margin-bottom: var(--space-sm);
+}
+
+.quick-trade-icon {
+  font-size: 18px;
+}
+
+.quick-trade-title {
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.quick-trade-buttons {
+  display: flex;
+  gap: var(--space-sm);
+}
+
+.quick-trade-btn {
+  flex: 1;
+  padding: var(--space-sm) var(--space-md);
+  border: none;
+  border-radius: var(--radius-sm);
+  font-weight: 700;
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.quick-trade-btn.yes {
+  background: var(--success);
+  color: white;
+}
+
+.quick-trade-btn.yes:hover {
+  background: #059669;
+  transform: scale(1.02);
+}
+
+.quick-trade-btn.no {
+  background: var(--danger);
+  color: white;
+}
+
+.quick-trade-btn.no:hover {
+  background: #DC2626;
+  transform: scale(1.02);
+}
+
+.quick-trade-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.quick-trade-warning {
+  font-size: 11px;
+  color: var(--text-secondary);
+  margin-top: var(--space-xs);
+  text-align: center;
+}
+
 /* Utilities */
 .hidden {
   display: none !important;

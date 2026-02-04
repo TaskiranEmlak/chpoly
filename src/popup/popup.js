@@ -123,6 +123,11 @@ function initElements() {
   elements.pnlRoi = document.getElementById('pnlRoi');
   elements.pnlProfit = document.getElementById('pnlProfit');
   elements.pnlChart = document.getElementById('pnlChart');
+
+  // Quick Trade
+  elements.quickTradeSection = document.getElementById('quickTradeSection');
+  elements.quickTradeYes = document.getElementById('quickTradeYes');
+  elements.quickTradeNo = document.getElementById('quickTradeNo');
 }
 
 function initAnalyzers() {
@@ -160,15 +165,13 @@ function setupEventListeners() {
   elements.reanalyzeBtn?.addEventListener('click', handleAnalyze);
   elements.retryBtn?.addEventListener('click', handleAnalyze);
 
-  elements.clearHistoryBtn?.addEventListener('click', async () => {
-    if (confirm('Geçmişi silmek istediğinizden emin misiniz?')) {
-      await chrome.storage.local.remove(['history', 'scanHistory']);
-      loadHistory();
-    }
-  });
-
+  elements.clearHistoryBtn?.addEventListener('click', clearHistory);
   elements.saveSettingsBtn?.addEventListener('click', saveSettings);
-  elements.exportBtn?.addEventListener('click', exportHistory);
+  elements.exportBtn?.addEventListener('click', exportData);
+
+  // Quick Trade handlers
+  elements.quickTradeYes?.addEventListener('click', () => handleQuickTrade('YES'));
+  elements.quickTradeNo?.addEventListener('click', () => handleQuickTrade('NO'));
 
   // Scanner Listeners
   elements.autoScanToggle?.addEventListener('change', async (e) => {
@@ -613,6 +616,9 @@ function showResult(market, result, traderSignals = null, liquidityData = null) 
   } else {
     elements.liquiditySection?.classList.add('hidden');
   }
+
+  // Quick Trade Section - Analiz sonucu varsa göster
+  elements.quickTradeSection?.classList.remove('hidden');
 }
 
 function showLoading(text) {
@@ -854,4 +860,63 @@ function renderMiniChart(dataPoints) {
     />
     <line x1="0" y1="${height - ((0 - minVal) / range) * height}" x2="${width}" y2="${height - ((0 - minVal) / range) * height}" stroke="#334155" stroke-dasharray="4" />
   `;
+}
+
+// FAZ 5: Quick Trade Handler
+async function handleQuickTrade(outcome) {
+  const amount = 5; // Varsayılan $5
+
+  // GÜVENLIK: Kullanıcı onayı
+  const confirmed = confirm(`⚠️ DİKKAT: GERÇEK PARA İŞLEMİ!\n\n${outcome} için $${amount} işlem yapılacak.\n\nDevam etmek istiyor musunuz?`);
+
+  if (!confirmed) {
+    console.log('❌ Kullanıcı işlemi iptal etti');
+    return;
+  }
+
+  // Butonları disable et
+  if (elements.quickTradeYes) elements.quickTradeYes.disabled = true;
+  if (elements.quickTradeNo) elements.quickTradeNo.disabled = true;
+
+  try {
+    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+
+    if (!tab?.url?.includes('polymarket.com')) {
+      alert('❌ Lütfen bir Polymarket sayfasına gidin');
+      return;
+    }
+
+    // Content script'e mesaj gönder
+    const response = await chrome.tabs.sendMessage(tab.id, {
+      type: 'EXECUTE_TRADE',
+      outcome: outcome,
+      amount: amount
+    });
+
+    if (response?.success) {
+      alert(`✅ İşlem gönderildi!\n\n${response.message}`);
+      console.log('🎉 Trade başarılı:', response);
+    } else {
+      alert(`❌ İşlem başarısız!\n\n${response?.error || 'Bilinmeyen hata'}`);
+      console.error('Trade hatası:', response?.error);
+    }
+
+  } catch (error) {
+    console.error('Quick trade error:', error);
+    alert(`❌ Hata: ${error.message}\n\nContent script yüklenmemiş olabilir. Sayfayı yenileyin.`);
+  } finally {
+    // Butonları tekrar aktif et
+    if (elements.quickTradeYes) elements.quickTradeYes.disabled = false;
+    if (elements.quickTradeNo) elements.quickTradeNo.disabled = false;
+  }
+}
+
+// Clear History
+async function clearHistory() {
+  if (confirm('Geçmişi silmek istediğinizden emin misiniz?')) {
+    analysisHistory = [];
+    await chrome.storage.local.remove(['analysisHistory']);
+    renderHistory();
+    updatePnlDashboard();
+  }
 }

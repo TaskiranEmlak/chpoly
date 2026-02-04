@@ -45,7 +45,180 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         }
         return true;
     }
+
+    // FAZ 5: AUTO-EXECUTE
+    if (message.type === 'EXECUTE_TRADE') {
+        executeTrade(message.outcome, message.amount)
+            .then(result => sendResponse(result))
+            .catch(err => sendResponse({ success: false, error: err.message }));
+        return true; // async response
+    }
 });
+
+/**
+ * FAZ 5: Tek Tıkla İşlem - Auto Execute Trade
+ * @param {string} outcome - 'YES' veya 'NO'
+ * @param {number} amount - İşlem tutarı (USD cinsinden)
+ */
+async function executeTrade(outcome, amount = 5) {
+    console.log(`⚡ Auto-Execute başlatılıyor: ${outcome} $${amount}`);
+
+    // GÜVENLIK: Maksimum tek işlem limiti
+    const MAX_SINGLE_TRADE = 50;
+    if (amount > MAX_SINGLE_TRADE) {
+        return { success: false, error: `Maksimum işlem limiti $${MAX_SINGLE_TRADE}` };
+    }
+
+    try {
+        // Step 1: Doğru butonu bul (Buy Yes veya Buy No)
+        const buyButton = findBuyButton(outcome);
+        if (!buyButton) {
+            return { success: false, error: `${outcome} için Buy butonu bulunamadı` };
+        }
+
+        console.log('✅ Buy butonu bulundu:', buyButton.textContent);
+
+        // Step 2: Butona tıkla (order panel açılır)
+        buyButton.click();
+        await sleep(500); // Panel açılmasını bekle
+
+        // Step 3: Amount input'u bul ve değeri gir
+        const amountInput = findAmountInput();
+        if (amountInput) {
+            // Clear and set new value
+            amountInput.value = '';
+            amountInput.focus();
+
+            // Simüle keyboard input (React için)
+            const nativeInputValueSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set;
+            nativeInputValueSetter.call(amountInput, amount.toString());
+            amountInput.dispatchEvent(new Event('input', { bubbles: true }));
+
+            console.log('✅ Tutar girildi:', amount);
+            await sleep(300);
+        } else {
+            console.log('⚠️ Amount input bulunamadı, varsayılan tutar kullanılacak');
+        }
+
+        // Step 4: Confirm/Submit butonu bul ve tıkla
+        const confirmButton = findConfirmButton();
+        if (!confirmButton) {
+            return { success: false, error: 'Onay butonu bulunamadı. Manuel işlem yapın.' };
+        }
+
+        console.log('✅ Confirm butonu bulundu:', confirmButton.textContent);
+
+        // FINAL CHECK: Kullanıcı onayı (tarayıcı confirm dialog'u)
+        // NOT: Popup'tan geldiği için bu çalışmayabilir, popup tarafında kontrol edilmeli
+
+        // Butona tıkla
+        confirmButton.click();
+        console.log('🎉 İşlem gönderildi!');
+
+        await sleep(1000);
+
+        // Başarılı sonuç
+        return {
+            success: true,
+            message: `${outcome} için $${amount} işlem gönderildi`,
+            timestamp: Date.now()
+        };
+
+    } catch (error) {
+        console.error('❌ Trade execution error:', error);
+        return { success: false, error: error.message };
+    }
+}
+
+/**
+ * Buy butonunu bul
+ */
+function findBuyButton(outcome) {
+    const buttons = document.querySelectorAll('button');
+    const targetText = outcome.toLowerCase();
+
+    for (const btn of buttons) {
+        const text = btn.textContent.toLowerCase();
+        // "Buy Yes" veya "Buy No" formatı
+        if (text.includes('buy') && text.includes(targetText)) {
+            return btn;
+        }
+    }
+
+    // Alternatif: Sadece "Yes" veya "No" yazan buton (satın al bağlamında)
+    for (const btn of buttons) {
+        const text = btn.textContent.toLowerCase().trim();
+        if (text === targetText || text === `buy ${targetText}`) {
+            return btn;
+        }
+    }
+
+    return null;
+}
+
+/**
+ * Amount input alanını bul
+ */
+function findAmountInput() {
+    // Tutar girişi için input alanları
+    const selectors = [
+        'input[type="number"]',
+        'input[placeholder*="$"]',
+        'input[placeholder*="Amount"]',
+        'input[placeholder*="amount"]',
+        'input[class*="amount"]',
+        'input[class*="input"]'
+    ];
+
+    for (const selector of selectors) {
+        const input = document.querySelector(selector);
+        if (input && isVisible(input)) {
+            return input;
+        }
+    }
+
+    return null;
+}
+
+/**
+ * Confirm/Submit butonu bul
+ */
+function findConfirmButton() {
+    const buttons = document.querySelectorAll('button');
+    const confirmTexts = ['confirm', 'submit', 'buy', 'place order', 'execute', 'trade'];
+
+    for (const btn of buttons) {
+        const text = btn.textContent.toLowerCase().trim();
+        for (const target of confirmTexts) {
+            if (text.includes(target) && !text.includes('cancel')) {
+                // İşlem butonları genellikle stilize edilmiştir
+                if (isVisible(btn) && !btn.disabled) {
+                    return btn;
+                }
+            }
+        }
+    }
+
+    return null;
+}
+
+/**
+ * Element görünür mü kontrolü
+ */
+function isVisible(el) {
+    const style = window.getComputedStyle(el);
+    return style.display !== 'none' &&
+        style.visibility !== 'hidden' &&
+        style.opacity !== '0' &&
+        el.offsetParent !== null;
+}
+
+/**
+ * Sleep utility
+ */
+function sleep(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms));
+}
 
 /**
  * Extract market information from the current Polymarket page
