@@ -207,6 +207,23 @@
           </div>
         </div>
 
+        <!-- News Sentiment Section -->
+        <div class="news-section hidden" id="newsSection">
+          <div class="section-header">
+            <span class="section-icon">📰</span>
+            <span class="section-title">Haber Analizi</span>
+          </div>
+          <div class="news-content">
+            <div class="news-sentiment-bar">
+              <span class="news-sentiment-emoji" id="newsSentimentEmoji">🟡</span>
+              <span class="news-sentiment-label" id="newsSentimentLabel">Yükleniyor...</span>
+              <span class="news-sentiment-score" id="newsSentimentScore">0</span>
+            </div>
+            <div class="news-recommendation" id="newsRecommendation"></div>
+            <div class="news-list" id="newsList"></div>
+          </div>
+        </div>
+
         <!-- Trader Signals -->
         <div class="traders-section hidden" id="tradersSection">
           <div class="section-header">
@@ -363,6 +380,7 @@
 
   <script src="../analyzers/crypto-analyzer.js"></script>
   <script src="../analyzers/liquidity-analyzer.js"></script>
+  <script src="../analyzers/news-sentiment.js"></script>
   <script src="../utils/pnl-tracker.js"></script>
   <script src="../api/polymarket.js"></script>
   <script src="popup.js"></script>

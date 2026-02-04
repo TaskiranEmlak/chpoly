@@ -11,6 +11,7 @@ let cryptoAnalyzer = null;
 let polymarketAPI = null;
 let liquidityAnalyzer = null;
 let pnlTracker = null;
+let newsSentiment = null;
 
 // Market Type Icons
 const MARKET_ICONS = {
@@ -136,6 +137,14 @@ function initElements() {
   elements.arbDiff = document.getElementById('arbDiff');
   elements.arbSignal = document.getElementById('arbSignal');
   elements.arbSignalText = document.getElementById('arbSignalText');
+
+  // News
+  elements.newsSection = document.getElementById('newsSection');
+  elements.newsSentimentEmoji = document.getElementById('newsSentimentEmoji');
+  elements.newsSentimentLabel = document.getElementById('newsSentimentLabel');
+  elements.newsSentimentScore = document.getElementById('newsSentimentScore');
+  elements.newsRecommendation = document.getElementById('newsRecommendation');
+  elements.newsList = document.getElementById('newsList');
 }
 
 function initAnalyzers() {
@@ -161,6 +170,12 @@ function initAnalyzers() {
   if (typeof PnLTracker !== 'undefined') {
     pnlTracker = new PnLTracker();
     console.log('✅ PnLTracker initialized');
+  }
+
+  // Initialize NewsSentiment if available
+  if (typeof NewsSentiment !== 'undefined') {
+    newsSentiment = new NewsSentiment();
+    console.log('✅ NewsSentiment initialized');
   }
 }
 
@@ -384,6 +399,7 @@ async function handleAnalyze() {
     // Arbitraj analizi (kripto için)
     if (currentMarket.type === 'crypto') {
       updateArbitrageSection(currentMarket);
+      updateNewsSection(currentMarket);
     }
 
     await saveToHistory(currentMarket, analysisResult);
@@ -991,5 +1007,60 @@ async function updateArbitrageSection(market) {
   } catch (error) {
     console.error('Arbitrage update error:', error);
     elements.arbitrageSection?.classList.add('hidden');
+  }
+}
+
+/**
+ * News Sentiment Section Güncelleme
+ * Kripto marketler için haber analizi yapar
+ */
+async function updateNewsSection(market) {
+  if (!newsSentiment || !market || market.type !== 'crypto') {
+    elements.newsSection?.classList.add('hidden');
+    return;
+  }
+
+  try {
+    const coin = market.coin || (market.title?.toLowerCase().includes('btc') ? 'BTC' : 'ETH');
+    const summary = await newsSentiment.getSentimentSummary(coin);
+
+    // Section'ı göster
+    elements.newsSection?.classList.remove('hidden');
+
+    // Sentiment bar güncelle
+    if (elements.newsSentimentEmoji) {
+      elements.newsSentimentEmoji.textContent = summary.emoji;
+    }
+
+    if (elements.newsSentimentLabel) {
+      const labelMap = { bullish: 'Pozitif', bearish: 'Negatif', neutral: 'Nötr' };
+      elements.newsSentimentLabel.textContent = `${coin} Haberleri: ${labelMap[summary.overallSentiment] || 'Nötr'}`;
+    }
+
+    if (elements.newsSentimentScore) {
+      elements.newsSentimentScore.textContent = `${summary.sentimentScore > 0 ? '+' : ''}${summary.sentimentScore}`;
+      elements.newsSentimentScore.className = 'news-sentiment-score ' +
+        (summary.sentimentScore > 0 ? 'positive' : summary.sentimentScore < 0 ? 'negative' : '');
+    }
+
+    if (elements.newsRecommendation) {
+      elements.newsRecommendation.textContent = summary.recommendation;
+    }
+
+    // Haber listesi
+    if (elements.newsList && summary.topNews.length > 0) {
+      elements.newsList.innerHTML = summary.topNews.map(news => `
+        <div class="news-item">
+          <span class="news-item-emoji">${news.sentiment.emoji}</span>
+          <div class="news-item-title">
+            <a href="${news.url}" target="_blank">${news.title}</a>
+          </div>
+        </div>
+      `).join('');
+    }
+
+  } catch (error) {
+    console.error('News update error:', error);
+    elements.newsSection?.classList.add('hidden');
   }
 }
