@@ -68,9 +68,13 @@ class MarketScanner {
 
         const fetchAndProcess = async (params) => {
             try {
-                const response = await fetch(`${this.gammaUrl}/events?active=true&closed=false&${params}`);
+                const url = `${this.gammaUrl}/events?active=true&closed=false&${params}`;
+                console.log('🌐 API:', url);
+                const response = await fetch(url);
                 if (response.ok) {
                     const events = await response.json();
+                    console.log(`📥 ${events.length} event alındı (${params})`);
+
                     for (const event of events) {
                         if (!seenIds.has(event.id)) {
                             seenIds.add(event.id);
@@ -80,17 +84,23 @@ class MarketScanner {
 
                             const processed = this.processEvent(event);
                             if (processed) {
-                                // YENİ: 5-15 dakika kalan marketleri hedefle
+                                // Zaman hesapla
                                 const timeRemaining = processed.endTime - now;
                                 const minutesLeft = timeRemaining / 60000;
 
-                                // 1 ile 15 dakika arasında olanları al
-                                if (minutesLeft >= 1 && minutesLeft <= 15) {
+                                console.log(`⏱️ ${event.slug}: ${minutesLeft.toFixed(1)} dk kaldı`);
+
+                                // 0 ile 30 dakika arasında olanları al (gevşetildi)
+                                if (minutesLeft >= 0 && minutesLeft <= 30) {
                                     markets.push(processed);
                                 }
+                            } else {
+                                console.log(`⚠️ processEvent null: ${event.slug}`);
                             }
                         }
                     }
+                } else {
+                    console.error('API error:', response.status);
                 }
             } catch (e) {
                 console.error('Fetch error:', params, e);
