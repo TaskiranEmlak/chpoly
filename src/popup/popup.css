@@ -1083,6 +1083,73 @@ input:checked+.slider:before {
   opacity: 0.8;
 }
 
+/* Liquidity Section */
+.liquidity-section {
+  background: var(--bg-card);
+  border-radius: var(--radius-md);
+  padding: var(--space-md);
+  border: 1px solid var(--border);
+}
+
+.liquidity-content {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+
+.liquidity-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.liquidity-label {
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.liquidity-value {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.liquidity-value.good {
+  color: var(--success);
+}
+
+.liquidity-value.warning {
+  color: var(--warning);
+}
+
+.liquidity-value.danger {
+  color: var(--danger);
+}
+
+.liquidity-alert {
+  margin-top: var(--space-xs);
+  padding: var(--space-sm);
+  border-radius: var(--radius-sm);
+  font-size: 12px;
+  display: none;
+}
+
+.liquidity-alert.show {
+  display: block;
+}
+
+.liquidity-alert.warning {
+  background: var(--warning-bg);
+  color: var(--warning);
+  border: 1px solid rgba(245, 158, 11, 0.3);
+}
+
+.liquidity-alert.danger {
+  background: var(--danger-bg);
+  color: var(--danger);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+}
+
 /* Utilities */
 .hidden {
   display: none !important;

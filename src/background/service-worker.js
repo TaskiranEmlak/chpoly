@@ -169,15 +169,30 @@ class MarketScanner {
 
         let confidence = 0;
         let shouldSignal = false;
+        let urgency = 'LOW'; // LOW, MEDIUM, HIGH, CRITICAL
 
-        if (timeSeconds <= 30 && absGap >= 0.2) {
+        // SON 10 SANİYE - CRITICAL 🔴
+        if (timeSeconds <= 10 && absGap >= 0.1) {
+            confidence = 98;
+            urgency = 'CRITICAL';
+            shouldSignal = true;
+        }
+        // SON 30 SANİYE - HIGH 🟠
+        else if (timeSeconds <= 30 && absGap >= 0.2) {
             confidence = 95;
+            urgency = 'HIGH';
             shouldSignal = true;
-        } else if (timeSeconds <= 60 && absGap >= 0.4) {
+        }
+        // SON 1 DAKİKA - MEDIUM 🟡
+        else if (timeSeconds <= 60 && absGap >= 0.4) {
             confidence = 90;
+            urgency = 'MEDIUM';
             shouldSignal = true;
-        } else if (timeSeconds <= 120 && absGap >= 0.6) {
+        }
+        // SON 2 DAKİKA - LOW 🟢
+        else if (timeSeconds <= 120 && absGap >= 0.6) {
             confidence = 85;
+            urgency = 'LOW';
             shouldSignal = true;
         }
 
@@ -188,6 +203,7 @@ class MarketScanner {
             market: market,
             action: direction,
             confidence: confidence,
+            urgency: urgency,
             currentPrice: currentPrice,
             strikePrice: market.strikePrice,
             gapPercent: gapPercent,
@@ -214,29 +230,53 @@ class NotificationManager {
     constructor() {
         this.recentNotifications = new Map();
         this.notificationTimeout = 30000;
+
+        // Urgency renkleri
+        this.urgencyColors = {
+            'CRITICAL': '#DC2626', // Kırmızı
+            'HIGH': '#F97316',     // Turuncu
+            'MEDIUM': '#EAB308',   // Sarı
+            'LOW': '#22C55E'       // Yeşil
+        };
+
+        this.urgencyEmojis = {
+            'CRITICAL': '🔴',
+            'HIGH': '🟠',
+            'MEDIUM': '🟡',
+            'LOW': '🟢'
+        };
     }
 
     async sendSignal(signal) {
         const key = `${signal.market.id}_${signal.action}`;
         const lastNotification = this.recentNotifications.get(key);
 
-        if (lastNotification && Date.now() - lastNotification < this.notificationTimeout) {
+        // CRITICAL uyarılar için timeout'u kısa tut
+        const timeout = signal.urgency === 'CRITICAL' ? 10000 : this.notificationTimeout;
+
+        if (lastNotification && Date.now() - lastNotification < timeout) {
             return;
         }
 
         this.recentNotifications.set(key, Date.now());
 
-        const title = `🚨 ${signal.action} - ${signal.market.coin}`;
-        const message = `💰 %${signal.confidence} | $${signal.currentPrice.toLocaleString()} | ⏱️ ${signal.timeRemaining}sn`;
+        const urgencyEmoji = this.urgencyEmojis[signal.urgency] || '🔔';
+        const title = `${urgencyEmoji} ${signal.action} - ${signal.market.coin} | ${signal.timeRemaining}sn!`;
+
+        // CRITICAL için daha acil mesaj
+        let message = `💰 %${signal.confidence} | $${signal.currentPrice.toLocaleString()}`;
+        if (signal.urgency === 'CRITICAL') {
+            message = `⚡ HEMEN İŞLEM YAP! ${message}`;
+        }
 
         try {
             await chrome.notifications.create(`signal_${Date.now()}`, {
                 type: 'basic',
-                iconUrl: 'icons/icon128.png',
+                iconUrl: 'assets/icons/icon128.png',
                 title: title,
                 message: message,
-                priority: 2,
-                requireInteraction: true
+                priority: signal.urgency === 'CRITICAL' ? 2 : 1,
+                requireInteraction: signal.urgency === 'CRITICAL' || signal.urgency === 'HIGH'
             });
 
             await chrome.storage.local.set({
@@ -244,17 +284,25 @@ class NotificationManager {
                 lastSignalUrl: signal.market.url
             });
 
-            // Badge güncelle
-            chrome.action.setBadgeText({ text: signal.action });
-            chrome.action.setBadgeBackgroundColor({
-                color: signal.action === 'YES' ? '#10B981' : '#EF4444'
-            });
+            // Badge: Urgency'ye göre renk
+            const badgeColor = this.urgencyColors[signal.urgency] || '#10B981';
+            const badgeText = signal.timeRemaining <= 10 ? `${signal.timeRemaining}s` : signal.action;
 
-            console.log('✅ Bildirim:', title);
+            chrome.action.setBadgeText({ text: badgeText });
+            chrome.action.setBadgeBackgroundColor({ color: badgeColor });
+
+            console.log(`✅ ${signal.urgency} Uyarı:`, title);
 
         } catch (error) {
             console.error('Notification error:', error);
         }
+    }
+
+    // Countdown badge güncellemesi
+    updateBadgeCountdown(seconds, urgency) {
+        const color = this.urgencyColors[urgency] || '#22C55E';
+        chrome.action.setBadgeText({ text: `${seconds}s` });
+        chrome.action.setBadgeBackgroundColor({ color: color });
     }
 }
 

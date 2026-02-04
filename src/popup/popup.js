@@ -9,6 +9,7 @@ let analysisResult = null;
 let analysisHistory = [];
 let cryptoAnalyzer = null;
 let polymarketAPI = null;
+let liquidityAnalyzer = null;
 
 // Market Type Icons
 const MARKET_ICONS = {
@@ -108,6 +109,12 @@ function initElements() {
   elements.sportsApiKey = document.getElementById('sportsApiKey');
   elements.saveSettingsBtn = document.getElementById('saveSettingsBtn');
   elements.exportBtn = document.getElementById('exportBtn');
+
+  // Liquidity
+  elements.liquiditySection = document.getElementById('liquiditySection');
+  elements.liquiditySafe = document.getElementById('liquiditySafe');
+  elements.liquiditySpread = document.getElementById('liquiditySpread');
+  elements.liquidityAlert = document.getElementById('liquidityAlert');
 }
 
 function initAnalyzers() {
@@ -121,6 +128,12 @@ function initAnalyzers() {
   if (typeof PolymarketDataAPI !== 'undefined') {
     polymarketAPI = new PolymarketDataAPI();
     console.log('✅ PolymarketDataAPI initialized');
+  }
+
+  // Initialize LiquidityAnalyzer if available
+  if (typeof LiquidityAnalyzer !== 'undefined') {
+    liquidityAnalyzer = new LiquidityAnalyzer();
+    console.log('✅ LiquidityAnalyzer initialized');
   }
 }
 
@@ -325,7 +338,23 @@ async function handleAnalyze() {
       }
     }
 
-    showResult(currentMarket, analysisResult, traderSignals);
+    // Likidite analizi (kripto marketleri için)
+    let liquidityData = null;
+    if (liquidityAnalyzer && currentMarket.type === 'crypto') {
+      showLoading('Likidite kontrol ediliyor...');
+      try {
+        // Token ID'yi outcome'dan al
+        const yesOutcome = currentMarket.outcomes?.find(o => o.name.toLowerCase() === 'yes');
+        if (yesOutcome?.tokenId) {
+          liquidityData = await liquidityAnalyzer.analyze(yesOutcome.tokenId);
+          console.log('💧 Likidite:', liquidityData);
+        }
+      } catch (e) {
+        console.log('Liquidity analysis error:', e);
+      }
+    }
+
+    showResult(currentMarket, analysisResult, traderSignals, liquidityData);
     await saveToHistory(currentMarket, analysisResult);
 
     setStatus('Hazır');
@@ -412,7 +441,7 @@ function showMarketPreview(market) {
   }
 }
 
-function showResult(market, result, traderSignals = null) {
+function showResult(market, result, traderSignals = null, liquidityData = null) {
   hideLoading();
   hideError();
   elements.welcomeState?.classList.add('hidden');
@@ -538,6 +567,37 @@ function showResult(market, result, traderSignals = null) {
     }
   } else {
     elements.strategySection?.classList.add('hidden');
+  }
+
+  // Liquidity
+  if (liquidityData && liquidityData.available) {
+    elements.liquiditySection?.classList.remove('hidden');
+
+    // Güvenli işlem tutarı
+    const safeTrade = liquidityData.safeTradeSize?.recommended || 0;
+    if (elements.liquiditySafe) {
+      elements.liquiditySafe.textContent = `$${safeTrade.toLocaleString()}`;
+      elements.liquiditySafe.className = 'liquidity-value ' +
+        (safeTrade >= 500 ? 'good' : safeTrade >= 100 ? 'warning' : 'danger');
+    }
+
+    // Spread
+    if (elements.liquiditySpread && liquidityData.spread) {
+      elements.liquiditySpread.textContent = `${liquidityData.spread.percent}%`;
+      elements.liquiditySpread.className = 'liquidity-value ' +
+        (liquidityData.spread.status === 'good' ? 'good' :
+          liquidityData.spread.status === 'fair' ? 'warning' : 'danger');
+    }
+
+    // Uyarı mesajı
+    if (elements.liquidityAlert && liquidityData.recommendation?.length > 0) {
+      const firstRec = liquidityData.recommendation[0];
+      elements.liquidityAlert.textContent = firstRec;
+      elements.liquidityAlert.className = 'liquidity-alert show ' +
+        (safeTrade < 100 ? 'danger' : safeTrade < 500 ? 'warning' : '');
+    }
+  } else {
+    elements.liquiditySection?.classList.add('hidden');
   }
 }
 

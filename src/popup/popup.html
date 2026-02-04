@@ -162,6 +162,25 @@
           </div>
         </div>
 
+        <!-- Liquidity Analysis -->
+        <div class="liquidity-section hidden" id="liquiditySection">
+          <div class="section-header">
+            <span class="section-icon">💧</span>
+            <span class="section-title">Likidite</span>
+          </div>
+          <div class="liquidity-content">
+            <div class="liquidity-row">
+              <span class="liquidity-label">Max Güvenli İşlem</span>
+              <span class="liquidity-value" id="liquiditySafe">$--</span>
+            </div>
+            <div class="liquidity-row">
+              <span class="liquidity-label">Spread</span>
+              <span class="liquidity-value" id="liquiditySpread">--%</span>
+            </div>
+            <div class="liquidity-alert" id="liquidityAlert"></div>
+          </div>
+        </div>
+
         <!-- Trader Signals -->
         <div class="traders-section hidden" id="tradersSection">
           <div class="section-header">
@@ -278,6 +297,7 @@
   </div>
 
   <script src="../analyzers/crypto-analyzer.js"></script>
+  <script src="../analyzers/liquidity-analyzer.js"></script>
   <script src="../api/polymarket.js"></script>
   <script src="popup.js"></script>
 </body>
