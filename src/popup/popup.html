@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html lang="tr">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=400, initial-scale=1.0">
+  <title>Polymarket AI</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+
+<body>
+  <div class="app">
+    <!-- Header -->
+    <header class="header">
+      <div class="brand">
+        <div class="brand-icon">🔮</div>
+        <div class="brand-info">
+          <span class="brand-name">Polymarket AI</span>
+          <span class="brand-status" id="brandStatus">Hazır</span>
+        </div>
+      </div>
+      <div class="header-nav">
+        <button class="nav-btn active" data-tab="main" title="Ana Sayfa">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
+          </svg>
+        </button>
+        <button class="nav-btn" data-tab="history" title="Geçmiş">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="10" />
+            <polyline points="12,6 12,12 16,14" />
+          </svg>
+        </button>
+        <button class="nav-btn" data-tab="settings" title="Ayarlar">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="3" />
+            <path
+              d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z" />
+          </svg>
+        </button>
+      </div>
+    </header>
+
+    <!-- Main Tab -->
+    <main class="tab-panel active" id="mainTab">
+      <!-- Auto Scan Toggle -->
+      <div class="scanner-section" id="scannerSection">
+        <div class="scanner-toggle">
+          <div class="toggle-info">
+            <span class="toggle-icon">🔍</span>
+            <span class="toggle-label">Otomatik Tarama</span>
+          </div>
+          <label class="switch">
+            <input type="checkbox" id="autoScanToggle">
+            <span class="slider"></span>
+          </label>
+        </div>
+        <div class="scanner-status" id="scannerStatus">
+          <span class="status-dot"></span>
+          <span class="status-text">Tarama kapalı</span>
+        </div>
+      </div>
+
+      <!-- Last Signal -->
+      <div class="last-signal hidden" id="lastSignal">
+        <div class="signal-header">
+          <span class="signal-icon">🚨</span>
+          <span class="signal-title">Son Sinyal</span>
+        </div>
+        <div class="signal-content">
+          <div class="signal-action" id="signalAction">YES</div>
+          <div class="signal-details">
+            <span class="signal-coin" id="signalCoin">BTC</span>
+            <span class="signal-confidence" id="signalConfidence">95%</span>
+            <span class="signal-time" id="signalTime">5sn önce</span>
+          </div>
+        </div>
+        <button class="btn-secondary btn-block" id="openSignalBtn">Market'e Git</button>
+      </div>
+
+      <!-- Welcome State -->
+      <div class="welcome-state" id="welcomeState">
+        <div class="welcome-icon">📊</div>
+        <h2>Market Analizi</h2>
+        <p>Polymarket'te bir market sayfasına git ve analiz başlat</p>
+        <button class="btn-primary" id="analyzeBtn">
+          <span>Analiz Et</span>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="5" y1="12" x2="19" y2="12" />
+            <polyline points="12,5 19,12 12,19" />
+          </svg>
+        </button>
+      </div>
+
+      <!-- Analysis Result -->
+      <div class="analysis-result hidden" id="analysisResult">
+        <!-- Market Header -->
+        <div class="market-header">
+          <span class="market-badge" id="marketBadge">₿ Kripto</span>
+          <h1 class="market-title" id="marketTitle">Market Başlığı</h1>
+          <div class="market-meta">
+            <span class="meta-item" id="marketExpiry">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="12" cy="12" r="10" />
+                <polyline points="12,6 12,12 16,14" />
+              </svg>
+              --:--
+            </span>
+            <span class="meta-item" id="marketVolume">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <line x1="12" y1="20" x2="12" y2="10" />
+                <line x1="18" y1="20" x2="18" y2="4" />
+                <line x1="6" y1="20" x2="6" y2="16" />
+              </svg>
+              $--
+            </span>
+          </div>
+        </div>
+
+        <!-- Prediction Card -->
+        <div class="prediction-card" id="predictionCard">
+          <div class="prediction-main">
+            <div class="prediction-label">TAHMİN</div>
+            <div class="prediction-value" id="predictionValue">YES</div>
+          </div>
+          <div class="prediction-confidence">
+            <svg class="confidence-ring" viewBox="0 0 100 100">
+              <circle class="ring-bg" cx="50" cy="50" r="42" />
+              <circle class="ring-fill" id="confidenceRing" cx="50" cy="50" r="42" />
+            </svg>
+            <div class="confidence-text">
+              <span class="confidence-number" id="confidenceNumber">0</span>
+              <span class="confidence-symbol">%</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Market Prices -->
+        <div class="market-prices" id="marketPrices">
+          <!-- Will be populated dynamically -->
+        </div>
+
+        <!-- Analysis Insights -->
+        <div class="insights-section">
+          <div class="section-header">
+            <span class="section-icon">💡</span>
+            <span class="section-title">Analiz</span>
+          </div>
+          <div class="insights-list" id="insightsList">
+            <!-- Will be populated dynamically -->
+          </div>
+        </div>
+
+        <!-- Technical Indicators (for crypto) -->
+        <div class="indicators-section hidden" id="indicatorsSection">
+          <div class="section-header">
+            <span class="section-icon">📈</span>
+            <span class="section-title">Teknik</span>
+          </div>
+          <div class="indicators-grid" id="indicatorsGrid">
+            <!-- Will be populated dynamically -->
+          </div>
+        </div>
+
+        <!-- Trader Signals -->
+        <div class="traders-section hidden" id="tradersSection">
+          <div class="section-header">
+            <span class="section-icon">👥</span>
+            <span class="section-title">Trader Sinyalleri</span>
+          </div>
+          <div class="traders-bar">
+            <div class="traders-yes" id="tradersYes">
+              <span class="traders-label">YES</span>
+              <span class="traders-count" id="tradersYesCount">--</span>
+            </div>
+            <div class="traders-progress">
+              <div class="traders-fill" id="tradersFill" style="width: 50%"></div>
+            </div>
+            <div class="traders-no" id="tradersNo">
+              <span class="traders-count" id="tradersNoCount">--</span>
+              <span class="traders-label">NO</span>
+            </div>
+          </div>
+          <div class="traders-details" id="tradersDetails">
+            <!-- Will be populated dynamically -->
+          </div>
+        </div>
+
+        <!-- Strategy Info -->
+        <div class="strategy-section hidden" id="strategySection">
+          <div class="strategy-badge" id="strategyBadge">
+            <span class="strategy-icon">⏱️</span>
+            <span class="strategy-text" id="strategyText">Strateji</span>
+          </div>
+        </div>
+
+        <!-- Re-analyze Button -->
+        <button class="btn-secondary" id="reanalyzeBtn">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polyline points="23,4 23,10 17,10" />
+            <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10" />
+          </svg>
+          <span>Yeniden Analiz</span>
+        </button>
+      </div>
+
+      <!-- Loading State -->
+      <div class="loading-state hidden" id="loadingState">
+        <div class="loader"></div>
+        <p class="loading-text" id="loadingText">Analiz ediliyor...</p>
+      </div>
+
+      <!-- Error State -->
+      <div class="error-state hidden" id="errorState">
+        <div class="error-icon">⚠️</div>
+        <p class="error-text" id="errorText">Bir hata oluştu</p>
+        <button class="btn-secondary" id="retryBtn">Tekrar Dene</button>
+      </div>
+    </main>
+
+    <!-- History Tab -->
+    <div class="tab-panel" id="historyTab">
+      <div class="panel-header">
+        <h2>Geçmiş</h2>
+        <button class="btn-icon" id="clearHistoryBtn" title="Temizle">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polyline points="3,6 5,6 21,6" />
+            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+          </svg>
+        </button>
+      </div>
+      <div class="history-list" id="historyList">
+        <div class="empty-state">
+          <span>📭</span>
+          <p>Henüz analiz yok</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Settings Tab -->
+    <div class="tab-panel" id="settingsTab">
+      <div class="panel-header">
+        <h2>Ayarlar</h2>
+      </div>
+
+      <div class="settings-group">
+        <label class="settings-label">
+          <span class="label-icon">🏈</span>
+          <span>Sports API Key</span>
+        </label>
+        <input type="text" class="settings-input" id="sportsApiKey" placeholder="API key girin...">
+        <a href="https://dashboard.api-football.com" target="_blank" class="settings-link">
+          Ücretsiz key al →
+        </a>
+      </div>
+
+      <div class="settings-group">
+        <label class="settings-label">
+          <span class="label-icon">📊</span>
+          <span>Veri</span>
+        </label>
+        <button class="btn-secondary btn-block" id="exportBtn">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+            <polyline points="7,10 12,15 17,10" />
+            <line x1="12" y1="15" x2="12" y2="3" />
+          </svg>
+          Verileri Dışa Aktar
+        </button>
+      </div>
+
+      <button class="btn-primary btn-block" id="saveSettingsBtn">Kaydet</button>
+
+      <div class="version-info">
+        Polymarket AI v2.0
+      </div>
+    </div>
+  </div>
+
+  <script src="../analyzers/crypto-analyzer.js"></script>
+  <script src="../api/polymarket.js"></script>
+  <script src="popup.js"></script>
+</body>
+
+</html>

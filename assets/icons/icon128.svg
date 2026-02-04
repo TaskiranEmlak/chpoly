@@ -1,0 +1,50 @@
+<svg width="128" height="128" viewBox="0 0 128 128" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#1a1a2e"/>
+      <stop offset="100%" style="stop-color:#0f0f1a"/>
+    </linearGradient>
+    <linearGradient id="ballGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#6366f1"/>
+      <stop offset="50%" style="stop-color:#8b5cf6"/>
+      <stop offset="100%" style="stop-color:#a855f7"/>
+    </linearGradient>
+    <linearGradient id="shine" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#ffffff;stop-opacity:0.4"/>
+      <stop offset="100%" style="stop-color:#ffffff;stop-opacity:0"/>
+    </linearGradient>
+    <filter id="glow">
+      <feGaussianBlur stdDeviation="4" result="coloredBlur"/>
+      <feMerge>
+        <feMergeNode in="coloredBlur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+  
+  <!-- Background -->
+  <rect width="128" height="128" rx="24" fill="url(#bgGrad)"/>
+  
+  <!-- Outer glow ring -->
+  <circle cx="64" cy="60" r="42" fill="none" stroke="url(#ballGrad)" stroke-width="2" opacity="0.3" filter="url(#glow)"/>
+  
+  <!-- Crystal ball -->
+  <circle cx="64" cy="60" r="36" fill="url(#ballGrad)" filter="url(#glow)"/>
+  
+  <!-- Shine -->
+  <ellipse cx="52" cy="48" rx="12" ry="8" fill="url(#shine)"/>
+  
+  <!-- Inner mystical symbols -->
+  <path d="M54 55 L64 50 L74 55 L64 75 Z" fill="rgba(255,255,255,0.15)"/>
+  
+  <!-- Base/stand -->
+  <path d="M44 96 Q64 88 84 96 L80 100 Q64 94 48 100 Z" fill="#4f46e5"/>
+  <ellipse cx="64" cy="96" rx="20" ry="4" fill="#3730a3"/>
+  
+  <!-- Chart lines inside ball -->
+  <path d="M48 62 L56 58 L64 64 L72 54 L80 60" 
+        stroke="rgba(255,255,255,0.5)" 
+        stroke-width="2" 
+        fill="none" 
+        stroke-linecap="round"/>
+</svg>

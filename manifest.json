@@ -1,0 +1,62 @@
+{
+  "manifest_version": 3,
+  "name": "Polymarket Tahmin Asistanı",
+  "version": "1.0.0",
+  "description": "Polymarket marketlerini analiz edip kazanma ihtimalini hesaplar",
+  "icons": {
+    "16": "assets/icons/icon16.png",
+    "48": "assets/icons/icon48.png",
+    "128": "assets/icons/icon128.png"
+  },
+  "action": {
+    "default_popup": "src/popup/popup.html",
+    "default_icon": {
+      "16": "assets/icons/icon16.png",
+      "48": "assets/icons/icon48.png"
+    },
+    "default_title": "Polymarket Analiz"
+  },
+  "permissions": [
+    "activeTab",
+    "storage",
+    "alarms",
+    "scripting",
+    "notifications"
+  ],
+  "host_permissions": [
+    "https://polymarket.com/*",
+    "https://*.polymarket.com/*",
+    "https://gamma-api.polymarket.com/*",
+    "https://clob.polymarket.com/*",
+    "https://data-api.polymarket.com/*",
+    "https://api.binance.com/*",
+    "https://api.coingecko.com/*",
+    "https://api-football-v1.p.rapidapi.com/*",
+    "https://v3.football.api-sports.io/*"
+  ],
+  "background": {
+    "service_worker": "src/background/service-worker.js"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://polymarket.com/*",
+        "https://*.polymarket.com/*"
+      ],
+      "js": [
+        "src/content/content.js"
+      ],
+      "run_at": "document_idle"
+    }
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": [
+        "assets/*"
+      ],
+      "matches": [
+        "https://polymarket.com/*"
+      ]
+    }
+  ]
+}
