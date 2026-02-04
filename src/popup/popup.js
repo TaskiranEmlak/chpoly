@@ -10,6 +10,7 @@ let analysisHistory = [];
 let cryptoAnalyzer = null;
 let polymarketAPI = null;
 let liquidityAnalyzer = null;
+let pnlTracker = null;
 
 // Market Type Icons
 const MARKET_ICONS = {
@@ -115,6 +116,13 @@ function initElements() {
   elements.liquiditySafe = document.getElementById('liquiditySafe');
   elements.liquiditySpread = document.getElementById('liquiditySpread');
   elements.liquidityAlert = document.getElementById('liquidityAlert');
+
+  // P&L
+  elements.pnlDashboard = document.getElementById('pnlDashboard');
+  elements.pnlWinRate = document.getElementById('pnlWinRate');
+  elements.pnlRoi = document.getElementById('pnlRoi');
+  elements.pnlProfit = document.getElementById('pnlProfit');
+  elements.pnlChart = document.getElementById('pnlChart');
 }
 
 function initAnalyzers() {
@@ -134,6 +142,12 @@ function initAnalyzers() {
   if (typeof LiquidityAnalyzer !== 'undefined') {
     liquidityAnalyzer = new LiquidityAnalyzer();
     console.log('✅ LiquidityAnalyzer initialized');
+  }
+
+  // Initialize PnLTracker if available
+  if (typeof PnLTracker !== 'undefined') {
+    pnlTracker = new PnLTracker();
+    console.log('✅ PnLTracker initialized');
   }
 }
 
@@ -635,56 +649,84 @@ async function loadHistory() {
     const data = await chrome.storage.local.get('analysisHistory');
     analysisHistory = data.analysisHistory || [];
     renderHistory();
+    updatePnlDashboard();
   } catch (e) {
     analysisHistory = [];
   }
 }
 
 async function saveToHistory(market, result) {
-  const entry = {
-    id: Date.now(),
-    timestamp: new Date().toISOString(),
-    url: market.url,
-    title: market.title,
-    type: market.type,
-    prediction: result.prediction,
-    confidence: result.confidence
+  const item = {
+    market,
+    result,
+    timestamp: Date.now()
   };
 
-  analysisHistory.unshift(entry);
-  if (analysisHistory.length > 50) analysisHistory = analysisHistory.slice(0, 50);
+  // En başa ekle
+  analysisHistory.unshift(item);
+
+  // Max 50
+  if (analysisHistory.length > 50) {
+    analysisHistory = analysisHistory.slice(0, 50);
+  }
 
   await chrome.storage.local.set({ analysisHistory });
   renderHistory();
+  updatePnlDashboard();
 }
 
 function renderHistory() {
   if (!elements.historyList) return;
 
+  elements.historyList.innerHTML = '';
+
   if (analysisHistory.length === 0) {
     elements.historyList.innerHTML = `
-      <div class="empty-state"><span>📭</span><p>Henüz analiz yok</p></div>
+      <div class="empty-state">
+        <span>📭</span>
+        <p>Henüz analiz yok</p>
+      </div>
     `;
     return;
   }
 
-  elements.historyList.innerHTML = analysisHistory.map(h => `
-    <div class="history-item" data-url="${h.url}">
-      <div class="history-info">
-        <div class="history-title">${h.title}</div>
-        <div class="history-time">${formatTime(h.timestamp)}</div>
-      </div>
-      <div class="history-result">
-        <span class="history-prediction ${h.prediction.toLowerCase()}">${h.prediction}</span>
-      </div>
-    </div>
-  `).join('');
+  analysisHistory.forEach(item => {
+    const div = document.createElement('div');
+    div.className = 'history-item';
 
-  elements.historyList.querySelectorAll('.history-item').forEach(item => {
-    item.addEventListener('click', () => {
-      const url = item.dataset.url;
-      if (url) chrome.tabs.create({ url });
-    });
+    const date = new Date(item.timestamp).toLocaleTimeString();
+    const prediction = item.result.prediction;
+    const isYes = prediction.toUpperCase() === 'YES';
+
+    // Result badge or buttons
+    let resultHtml = '';
+    if (item.outcome) {
+      // Zaten sonuçlanmış
+      const isWin = item.outcome === 'WON';
+      resultHtml = `<span class="result-badge ${isWin ? 'won' : 'lost'}">${isWin ? 'KAZANDI' : 'KAYBETTİ'}</span>`;
+    } else {
+      // Sonuç girilmeli
+      resultHtml = `
+        <button class="history-action-btn won" onclick="window.setHistoryResult(${item.timestamp}, 'WON')">✅</button>
+        <button class="history-action-btn lost" onclick="window.setHistoryResult(${item.timestamp}, 'LOST')">❌</button>
+      `;
+    }
+
+    div.innerHTML = `
+      <div class="history-header">
+        <span class="history-coin">${item.market.coin}</span>
+        <span class="history-time">${date}</span>
+      </div>
+      <div class="history-details">
+        <span>Tahmin: <strong class="${isYes ? 'text-success' : 'text-danger'}">${prediction}</strong></span>
+        <span>Güven: %${item.result.confidence}</span>
+      </div>
+      <div class="history-actions">
+        ${resultHtml}
+      </div>
+    `;
+
+    elements.historyList.appendChild(div);
   });
 }
 
@@ -735,4 +777,81 @@ function formatTime(iso) {
   if (hours < 24) return `${hours} saat önce`;
   if (days < 7) return `${days} gün önce`;
   return date.toLocaleDateString('tr-TR');
+}
+
+// P&L Dashboard
+// Global scope for onclick access
+window.setHistoryResult = async (timestamp, result) => {
+  const index = analysisHistory.findIndex(item => item.timestamp === timestamp);
+  if (index !== -1) {
+    analysisHistory[index].outcome = result; // WON or LOST
+    await chrome.storage.local.set({ analysisHistory });
+    renderHistory();
+    updatePnlDashboard();
+  }
+};
+
+function updatePnlDashboard() {
+  if (!pnlTracker || !elements.pnlDashboard) return;
+
+  // Sadece sonucu belli olanları filtrele
+  const finishedTrades = analysisHistory.filter(item => item.outcome).map(item => ({
+    result: item.outcome, // PnLTracker 'result' bekliyor (WON/LOST)
+    timestamp: item.timestamp
+  }));
+
+  if (finishedTrades.length === 0) {
+    elements.pnlDashboard.classList.add('hidden');
+    return;
+  }
+
+  elements.pnlDashboard.classList.remove('hidden');
+  const stats = pnlTracker.calculateStats(finishedTrades);
+
+  if (elements.pnlWinRate) {
+    elements.pnlWinRate.textContent = `${stats.winRate.toFixed(1)}%`;
+    elements.pnlWinRate.className = 'pnl-value ' + (stats.winRate >= 50 ? 'positive' : 'negative');
+  }
+
+  if (elements.pnlRoi) {
+    elements.pnlRoi.textContent = `${stats.roi.toFixed(1)}%`;
+    elements.pnlRoi.className = 'pnl-value ' + (stats.roi >= 0 ? 'positive' : 'negative');
+  }
+
+  if (elements.pnlProfit) {
+    elements.pnlProfit.textContent = `$${stats.totalProfit.toLocaleString()}`;
+    elements.pnlProfit.className = 'pnl-value ' + (stats.totalProfit >= 0 ? 'positive' : 'negative');
+  }
+
+  renderMiniChart(stats.equityCurve);
+}
+
+function renderMiniChart(dataPoints) {
+  if (!elements.pnlChart || dataPoints.length < 2) return;
+
+  const width = elements.pnlChart.clientWidth || 300;
+  const height = 40;
+
+  // Min/Max values for scaling
+  const values = dataPoints.map(d => d.value);
+  const minVal = Math.min(0, ...values);
+  const maxVal = Math.max(0, ...values);
+  const range = maxVal - minVal || 100;
+
+  const points = dataPoints.map((pt, i) => {
+    const x = (i / (dataPoints.length - 1)) * width;
+    // Normalize Y (0 at bottom, height at top)
+    const y = height - ((pt.value - minVal) / range) * height;
+    return `${x},${y}`;
+  }).join(' ');
+
+  elements.pnlChart.innerHTML = `
+    <polyline 
+      points="${points}" 
+      fill="none" 
+      stroke="${values[values.length - 1] >= 0 ? '#10B981' : '#EF4444'}" 
+      stroke-width="2"
+    />
+    <line x1="0" y1="${height - ((0 - minVal) / range) * height}" x2="${width}" y2="${height - ((0 - minVal) / range) * height}" stroke="#334155" stroke-dasharray="4" />
+  `;
 }

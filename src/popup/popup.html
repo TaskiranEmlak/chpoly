@@ -248,6 +248,28 @@
           </svg>
         </button>
       </div>
+
+      <!-- P&L Dashboard -->
+      <div class="pnl-dashboard hidden" id="pnlDashboard">
+        <div class="pnl-row">
+          <div class="pnl-card">
+            <span class="pnl-label">Win Rate</span>
+            <span class="pnl-value" id="pnlWinRate">--%</span>
+          </div>
+          <div class="pnl-card">
+            <span class="pnl-label">ROI</span>
+            <span class="pnl-value" id="pnlRoi">--%</span>
+          </div>
+          <div class="pnl-card">
+            <span class="pnl-label">Net Kâr</span>
+            <span class="pnl-value" id="pnlProfit">$--</span>
+          </div>
+        </div>
+        <div class="pnl-chart-container">
+          <!-- Basit SVG chart buraya gelecek -->
+          <svg id="pnlChart" width="100%" height="40"></svg>
+        </div>
+      </div>
       <div class="history-list" id="historyList">
         <div class="empty-state">
           <span>📭</span>
@@ -298,6 +320,7 @@
 
   <script src="../analyzers/crypto-analyzer.js"></script>
   <script src="../analyzers/liquidity-analyzer.js"></script>
+  <script src="../utils/pnl-tracker.js"></script>
   <script src="../api/polymarket.js"></script>
   <script src="popup.js"></script>
 </body>

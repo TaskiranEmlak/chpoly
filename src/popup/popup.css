@@ -1150,6 +1150,99 @@ input:checked+.slider:before {
   border: 1px solid rgba(239, 68, 68, 0.3);
 }
 
+/* P&L Dashboard */
+.pnl-dashboard {
+  background: var(--bg-card);
+  border-radius: var(--radius-md);
+  margin-bottom: var(--space-md);
+  padding: var(--space-md);
+  border: 1px solid var(--border);
+}
+
+.pnl-row {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-sm);
+  margin-bottom: var(--space-sm);
+}
+
+.pnl-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  flex: 1;
+}
+
+.pnl-label {
+  font-size: 11px;
+  color: var(--text-secondary);
+  margin-bottom: 2px;
+}
+
+.pnl-value {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.pnl-value.positive {
+  color: var(--success);
+}
+
+.pnl-value.negative {
+  color: var(--danger);
+}
+
+.pnl-chart-container {
+  height: 40px;
+  width: 100%;
+}
+
+.history-action-btn {
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 2px 6px;
+  font-size: 11px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  margin-left: 4px;
+}
+
+.history-action-btn:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.history-action-btn.won:hover {
+  background: var(--success-bg);
+  border-color: var(--success);
+  color: var(--success);
+}
+
+.history-action-btn.lost:hover {
+  background: var(--danger-bg);
+  border-color: var(--danger);
+  color: var(--danger);
+}
+
+.result-badge {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 6px;
+  border-radius: var(--radius-sm);
+}
+
+.result-badge.won {
+  background: var(--success-bg);
+  color: var(--success);
+}
+
+.result-badge.lost {
+  background: var(--danger-bg);
+  color: var(--danger);
+}
+
 /* Utilities */
 .hidden {
   display: none !important;
