@@ -76,6 +76,11 @@ class MarketScanner {
                     console.log(`📥 ${events.length} event alındı (${params})`);
 
                     for (const event of events) {
+                        // DEBUG: İlk 3 event'in slug'ını logla
+                        if (events.indexOf(event) < 3) {
+                            console.log(`🔎 Event slug: "${event.slug}"`);
+                        }
+
                         if (!seenIds.has(event.id)) {
                             seenIds.add(event.id);
 
