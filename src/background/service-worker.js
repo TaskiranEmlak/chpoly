@@ -63,64 +63,77 @@ class MarketScanner {
 
     async findActiveMarkets() {
         const markets = [];
-        const seenIds = new Set();
         const now = Date.now();
+        const nowSeconds = Math.floor(now / 1000);
 
-        const fetchAndProcess = async (params) => {
-            try {
-                const url = `${this.gammaUrl}/events?active=true&closed=false&${params}`;
-                console.log('🌐 API:', url);
-                const response = await fetch(url);
-                if (response.ok) {
-                    const events = await response.json();
-                    console.log(`📥 ${events.length} event alındı (${params})`);
+        // Gelecek 30 dakika içindeki 15'lik periyotları hesapla
+        // Her 15 dakikada bir market var (900 saniye)
+        const currentPeriod = Math.floor(nowSeconds / 900) * 900;
+        const periods = [];
 
-                    for (const event of events) {
-                        // DEBUG: İlk 3 event'in slug'ını logla
-                        if (events.indexOf(event) < 3) {
-                            console.log(`🔎 Event slug: "${event.slug}"`);
-                        }
+        // Şu anki ve gelecek 3 periyodu dahil et
+        for (let i = 0; i <= 3; i++) {
+            periods.push(currentPeriod + (i * 900));
+        }
 
-                        if (!seenIds.has(event.id)) {
-                            seenIds.add(event.id);
+        console.log('⏰ Taranacak periyotlar:', periods.map(p => new Date(p * 1000).toLocaleTimeString()));
 
-                            // Sadece 15m marketleri
-                            if (!event.slug?.includes('15m')) continue;
+        // Her coin için her periyodu tara
+        const coins = ['btc', 'eth', 'sol'];
+        const promises = [];
 
-                            const processed = this.processEvent(event);
-                            if (processed) {
-                                // Zaman hesapla
-                                const timeRemaining = processed.endTime - now;
-                                const minutesLeft = timeRemaining / 60000;
-
-                                console.log(`⏱️ ${event.slug}: ${minutesLeft.toFixed(1)} dk kaldı`);
-
-                                // 0 ile 30 dakika arasında olanları al (gevşetildi)
-                                if (minutesLeft >= 0 && minutesLeft <= 30) {
-                                    markets.push(processed);
-                                }
-                            } else {
-                                console.log(`⚠️ processEvent null: ${event.slug}`);
-                            }
-                        }
-                    }
-                } else {
-                    console.error('API error:', response.status);
-                }
-            } catch (e) {
-                console.error('Fetch error:', params, e);
+        for (const coin of coins) {
+            for (const period of periods) {
+                const slug = `${coin}-updown-15m-${period}`;
+                promises.push(this.fetchMarketBySlug(slug, now));
             }
-        };
+        }
 
-        // Tüm kripto marketleri tara
-        await Promise.all([
-            fetchAndProcess('slug_contains=btc-updown-15m&limit=100'),
-            fetchAndProcess('slug_contains=eth-updown-15m&limit=100'),
-            fetchAndProcess('slug_contains=sol-updown-15m&limit=50'),
-            fetchAndProcess('slug_contains=15m&limit=100')
-        ]);
+        const results = await Promise.all(promises);
+
+        for (const market of results) {
+            if (market) {
+                markets.push(market);
+            }
+        }
 
         return markets;
+    }
+
+    async fetchMarketBySlug(slug, now) {
+        try {
+            const url = `${this.gammaUrl}/events?slug=${slug}`;
+            const response = await fetch(url);
+
+            if (!response.ok) return null;
+
+            const events = await response.json();
+            if (!events || events.length === 0) return null;
+
+            const event = events[0];
+
+            // Aktif ve açık olmalı
+            if (!event.active || event.closed) return null;
+
+            const processed = this.processEvent(event);
+            if (!processed) return null;
+
+            // Zaman kontrolü
+            const timeRemaining = processed.endTime - now;
+            const minutesLeft = timeRemaining / 60000;
+
+            console.log(`✅ ${slug}: ${minutesLeft.toFixed(1)} dk kaldı`);
+
+            // Sadece 0-30 dakika kalanları kabul et
+            if (minutesLeft >= 0 && minutesLeft <= 30) {
+                return processed;
+            }
+
+            return null;
+        } catch (e) {
+            // Sessizce atla - bu slug için market yok
+            return null;
+        }
     }
 
     processEvent(event) {
