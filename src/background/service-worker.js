@@ -20,6 +20,15 @@ class MarketScanner {
         this.activeMarkets = new Map();
         this.scanInterval = null;
         this.onSignal = null;
+
+        // YENİ: Fiyat geçmişi (trend analizi için)
+        this.priceHistory = new Map(); // marketId -> [{price, timestamp}, ...]
+
+        // YENİ: Sinyal kilitleri (tutarlılık için)
+        this.signalLocks = new Map(); // marketId -> {direction, lockedAt, confidence}
+
+        // YENİ: Son gönderilen sinyaller (spam önleme)
+        this.sentSignals = new Map(); // marketId -> timestamp
     }
 
     start(intervalMs = 10000) {
@@ -33,12 +42,17 @@ class MarketScanner {
             clearInterval(this.scanInterval);
             this.scanInterval = null;
         }
-        console.log('⏹️ Market Scanner durduruldu');
     }
 
     async scan() {
+        console.log('🔄 Tarama...');
+        this.lastMarkets = [];
+
         try {
             const markets = await this.findActiveMarkets();
+            this.lastMarkets = markets;
+
+            console.log(`📊 ${markets.length} market bulundu`);
 
             for (const market of markets) {
                 await this.evaluateMarket(market);
@@ -51,21 +65,31 @@ class MarketScanner {
     async findActiveMarkets() {
         const markets = [];
         const seenIds = new Set();
+        const now = Date.now();
 
-        // Helper to fetch and process
         const fetchAndProcess = async (params) => {
             try {
-                const response = await fetch(`${this.gammaUrl}/events?active=true&${params}`);
+                const response = await fetch(`${this.gammaUrl}/events?active=true&closed=false&${params}`);
                 if (response.ok) {
                     const events = await response.json();
                     for (const event of events) {
                         if (!seenIds.has(event.id)) {
                             seenIds.add(event.id);
-                            // Ekstra kontrol: slug içinde 15m yoksa atla
+
+                            // Sadece 15m marketleri
                             if (!event.slug?.includes('15m')) continue;
 
                             const processed = this.processEvent(event);
-                            if (processed) markets.push(processed);
+                            if (processed) {
+                                // YENİ: 5-15 dakika kalan marketleri hedefle
+                                const timeRemaining = processed.endTime - now;
+                                const minutesLeft = timeRemaining / 60000;
+
+                                // 1 ile 15 dakika arasında olanları al
+                                if (minutesLeft >= 1 && minutesLeft <= 15) {
+                                    markets.push(processed);
+                                }
+                            }
                         }
                     }
                 }
@@ -74,11 +98,12 @@ class MarketScanner {
             }
         };
 
-        // Paralel aramalar: BTC, ETH, 15m tagleri
+        // Tüm kripto marketleri tara
         await Promise.all([
-            fetchAndProcess('slug_contains=btc-updown-15m'), // Spesifik BTC 15m
-            fetchAndProcess('slug_contains=eth-updown-15m'), // Spesifik ETH 15m
-            fetchAndProcess('limit=50&slug_contains=15m')    // Genel 15m araması
+            fetchAndProcess('slug_contains=btc-updown-15m&limit=100'),
+            fetchAndProcess('slug_contains=eth-updown-15m&limit=100'),
+            fetchAndProcess('slug_contains=sol-updown-15m&limit=50'),
+            fetchAndProcess('slug_contains=15m&limit=100')
         ]);
 
         return markets;
@@ -114,14 +139,14 @@ class MarketScanner {
 
             if (event.markets && event.markets.length > 0) {
                 const market = event.markets[0];
-                const desc = market.description || event.description || '';
+                const desc = market.description || event.description || event.title || '';
                 const priceMatch = desc.match(/\$?([\d,]+\.?\d*)/);
                 if (priceMatch) {
                     strikePrice = parseFloat(priceMatch[1].replace(/,/g, ''));
                 }
             }
 
-            if (!endTime) return null;
+            if (!endTime || !strikePrice) return null;
 
             return {
                 id: event.id,
@@ -142,63 +167,152 @@ class MarketScanner {
     async evaluateMarket(market) {
         const now = Date.now();
         const timeRemaining = market.endTime - now;
+        const timeSeconds = Math.round(timeRemaining / 1000);
+        const timeMinutes = timeRemaining / 60000;
 
-        // Son 2 dakika
-        if (timeRemaining <= 0 || timeRemaining > 120000) return;
+        // Geçersiz veya bitmiş market
+        if (timeRemaining <= 0) return;
 
-        console.log(`⏱️ ${market.coin}: ${Math.round(timeRemaining / 1000)} sn kaldı`);
-
-        if (!market.strikePrice) return;
-
+        // Fiyat al
         const currentPrice = await this.getCurrentPrice(market.binanceSymbol);
         if (!currentPrice) return;
 
+        // Fiyat geçmişine ekle
+        this.recordPrice(market.id, currentPrice);
+
         const gapPercent = ((currentPrice - market.strikePrice) / market.strikePrice) * 100;
-        const timeSeconds = Math.round(timeRemaining / 1000);
 
-        console.log(`📊 ${market.coin}: $${currentPrice.toLocaleString()} vs $${market.strikePrice.toLocaleString()} = ${gapPercent.toFixed(3)}%`);
+        console.log(`📊 ${market.coin} [${timeMinutes.toFixed(1)}dk]: $${currentPrice.toLocaleString()} vs Strike $${market.strikePrice.toLocaleString()} = ${gapPercent > 0 ? '+' : ''}${gapPercent.toFixed(3)}%`);
 
-        const signal = this.calculateSignal(timeSeconds, gapPercent, market, currentPrice);
+        // Trend analizi
+        const trend = this.analyzeTrend(market.id, market.strikePrice);
+
+        // Sinyal hesapla
+        const signal = this.calculateSmartSignal(market, currentPrice, gapPercent, timeSeconds, trend);
 
         if (signal && this.onSignal) {
-            this.onSignal(signal);
+            // Sinyal lock kontrolü
+            if (this.canSendSignal(market.id, signal.action)) {
+                this.lockSignal(market.id, signal.action, signal.confidence);
+                this.onSignal(signal);
+            }
         }
     }
 
-    calculateSignal(timeSeconds, gapPercent, market, currentPrice) {
+    // YENİ: Fiyat kaydet
+    recordPrice(marketId, price) {
+        if (!this.priceHistory.has(marketId)) {
+            this.priceHistory.set(marketId, []);
+        }
+
+        const history = this.priceHistory.get(marketId);
+        history.push({ price, timestamp: Date.now() });
+
+        // Son 5 dakikayı tut
+        const fiveMinutesAgo = Date.now() - 300000;
+        const filtered = history.filter(h => h.timestamp > fiveMinutesAgo);
+        this.priceHistory.set(marketId, filtered.slice(-60)); // Max 60 kayıt
+    }
+
+    // YENİ: Trend analiz et
+    analyzeTrend(marketId, strikePrice) {
+        const history = this.priceHistory.get(marketId) || [];
+
+        if (history.length < 3) {
+            return { direction: 'UNKNOWN', strength: 0, consistent: false };
+        }
+
+        // Son 1 dakika ortalaması vs ilk kayıt
+        const recentPrices = history.slice(-6).map(h => h.price);
+        const avgRecent = recentPrices.reduce((a, b) => a + b, 0) / recentPrices.length;
+        const firstPrice = history[0].price;
+
+        const priceChange = ((avgRecent - firstPrice) / firstPrice) * 100;
+
+        // Strike'a göre pozisyon
+        const aboveStrike = avgRecent > strikePrice;
+
+        // Tutarlılık kontrolü - trend değişti mi?
+        let consistent = true;
+        let aboveCount = 0;
+        let belowCount = 0;
+
+        for (const h of history) {
+            if (h.price > strikePrice) aboveCount++;
+            else belowCount++;
+        }
+
+        // %70'den fazla aynı tarafta mı?
+        const dominantSide = Math.max(aboveCount, belowCount) / history.length;
+        consistent = dominantSide >= 0.7;
+
+        return {
+            direction: aboveStrike ? 'UP' : 'DOWN',
+            strength: Math.abs(priceChange),
+            avgPrice: avgRecent,
+            consistent: consistent,
+            dominance: dominantSide
+        };
+    }
+
+    // YENİ: Akıllı sinyal hesapla
+    calculateSmartSignal(market, currentPrice, gapPercent, timeSeconds, trend) {
+        // KURAL 1: En az %70 tutarlılık gerekli
+        if (!trend.consistent && timeSeconds > 60) {
+            console.log(`⏸️ ${market.coin}: Trend tutarsız (%${(trend.dominance * 100).toFixed(0)}), bekle`);
+            return null;
+        }
+
+        // KURAL 2: Zaman bazlı değerlendirme
         const absGap = Math.abs(gapPercent);
-        const direction = gapPercent > 0 ? 'YES' : 'NO';
-
-        let confidence = 0;
         let shouldSignal = false;
-        let urgency = 'LOW'; // LOW, MEDIUM, HIGH, CRITICAL
+        let confidence = 0;
+        let urgency = 'LOW';
 
-        // SON 10 SANİYE - CRITICAL 🔴
-        if (timeSeconds <= 10 && absGap >= 0.1) {
-            confidence = 98;
-            urgency = 'CRITICAL';
-            shouldSignal = true;
+        // 5-15 DAKİKA: Erken uyarı (sadece güçlü trend varsa)
+        if (timeSeconds > 300 && timeSeconds <= 900) {
+            if (absGap >= 0.5 && trend.consistent) {
+                confidence = 70;
+                urgency = 'LOW';
+                shouldSignal = true;
+            }
         }
-        // SON 30 SANİYE - HIGH 🟠
-        else if (timeSeconds <= 30 && absGap >= 0.2) {
-            confidence = 95;
-            urgency = 'HIGH';
-            shouldSignal = true;
+        // 2-5 DAKİKA: Orta seviye
+        else if (timeSeconds > 120 && timeSeconds <= 300) {
+            if (absGap >= 0.3 && trend.consistent) {
+                confidence = 80;
+                urgency = 'MEDIUM';
+                shouldSignal = true;
+            }
         }
-        // SON 1 DAKİKA - MEDIUM 🟡
-        else if (timeSeconds <= 60 && absGap >= 0.4) {
-            confidence = 90;
-            urgency = 'MEDIUM';
-            shouldSignal = true;
+        // 1-2 DAKİKA: Yüksek güven
+        else if (timeSeconds > 60 && timeSeconds <= 120) {
+            if (absGap >= 0.2) {
+                confidence = 88;
+                urgency = 'HIGH';
+                shouldSignal = true;
+            }
         }
-        // SON 2 DAKİKA - LOW 🟢
-        else if (timeSeconds <= 120 && absGap >= 0.6) {
-            confidence = 85;
-            urgency = 'LOW';
-            shouldSignal = true;
+        // SON 1 DAKİKA: Kritik
+        else if (timeSeconds > 30 && timeSeconds <= 60) {
+            if (absGap >= 0.1) {
+                confidence = 92;
+                urgency = 'HIGH';
+                shouldSignal = true;
+            }
+        }
+        // SON 30 SANİYE: Artık fiyat neredeyse kesin
+        else if (timeSeconds <= 30) {
+            if (absGap >= 0.05) {
+                confidence = 96;
+                urgency = 'CRITICAL';
+                shouldSignal = true;
+            }
         }
 
         if (!shouldSignal) return null;
+
+        const direction = gapPercent > 0 ? 'YES' : 'NO';
 
         return {
             type: 'TRADE_SIGNAL',
@@ -211,8 +325,43 @@ class MarketScanner {
             gapPercent: gapPercent,
             timeRemaining: timeSeconds,
             timestamp: Date.now(),
-            reason: `${timeSeconds}sn, ${gapPercent > 0 ? '+' : ''}${gapPercent.toFixed(2)}% fark`
+            trend: trend,
+            reason: `${Math.round(timeSeconds / 60)}dk kaldı, ${gapPercent > 0 ? '+' : ''}${gapPercent.toFixed(2)}% fark, Trend: ${trend.direction} (%${(trend.dominance * 100).toFixed(0)} tutarlı)`
         };
+    }
+
+    // YENİ: Sinyal gönderilebilir mi?
+    canSendSignal(marketId, direction) {
+        // Aynı market için zaten sinyal lock'landı mı?
+        const lock = this.signalLocks.get(marketId);
+        if (lock) {
+            // Farklı yöne sinyal vermeye çalışıyor mu?
+            if (lock.direction !== direction) {
+                console.log(`🔒 ${marketId}: Sinyal kilitli (${lock.direction}), ${direction} gönderilemez`);
+                return false;
+            }
+        }
+
+        // Son sinyal ne zaman gönderildi?
+        const lastSent = this.sentSignals.get(marketId) || 0;
+        const cooldown = 60000; // 1 dakika cooldown
+
+        if (Date.now() - lastSent < cooldown) {
+            return false;
+        }
+
+        this.sentSignals.set(marketId, Date.now());
+        return true;
+    }
+
+    // YENİ: Sinyali kilitle
+    lockSignal(marketId, direction, confidence) {
+        this.signalLocks.set(marketId, {
+            direction: direction,
+            lockedAt: Date.now(),
+            confidence: confidence
+        });
+        console.log(`🔐 ${marketId}: Sinyal kilitlendi -> ${direction}`);
     }
 
     async getCurrentPrice(symbol) {
