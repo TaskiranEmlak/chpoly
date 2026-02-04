@@ -413,18 +413,15 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     console.log('Message:', message);
 
     if (message.type === 'TOGGLE_SCANNER') {
-        if (message.enabled) {
-            marketScanner.start(10000);
-            whaleScanner.start(60000); // Balina taraması 1dk
-            scannerEnabled = true;
-        } else {
-            marketScanner.stop();
-            whaleScanner.stop();
-            scannerEnabled = false;
-            chrome.action.setBadgeText({ text: '' });
-        }
-        sendResponse({ success: true, enabled: scannerEnabled });
-        return true;
+        (async () => {
+            if (message.enabled) {
+                await startAlarmScanning();
+            } else {
+                await stopAlarmScanning();
+            }
+            sendResponse({ success: true, enabled: scannerEnabled });
+        })();
+        return true; // async response
     }
 
     if (message.type === 'GET_SCANNER_STATUS') {
@@ -454,24 +451,113 @@ chrome.notifications.onClicked.addListener(async (notificationId) => {
     chrome.notifications.clear(notificationId);
 });
 
-// === KEEP ALIVE ===
+// === ALARM-BASED SCANNING ===
+// Chrome Manifest V3'te setInterval güvenilir değil, chrome.alarms kullanıyoruz
 
-chrome.alarms.create('keepAlive', { periodInMinutes: 1 });
-chrome.alarms.onAlarm.addListener((alarm) => {
-    if (alarm.name === 'keepAlive') {
+const ALARM_NAMES = {
+    MARKET_SCAN: 'marketScan',
+    WHALE_SCAN: 'whaleScan',
+    KEEP_ALIVE: 'keepAlive'
+};
+
+// Alarm tetiklendiğinde
+chrome.alarms.onAlarm.addListener(async (alarm) => {
+    console.log(`⏰ Alarm: ${alarm.name}`);
+
+    if (alarm.name === ALARM_NAMES.MARKET_SCAN && scannerEnabled) {
+        try {
+            await marketScanner.scan();
+        } catch (e) {
+            console.error('Market scan error:', e);
+        }
+    }
+
+    if (alarm.name === ALARM_NAMES.WHALE_SCAN && scannerEnabled) {
+        try {
+            await whaleScanner.scan();
+        } catch (e) {
+            console.error('Whale scan error:', e);
+        }
+    }
+
+    if (alarm.name === ALARM_NAMES.KEEP_ALIVE) {
         console.log('💓 Service worker aktif');
     }
 });
 
-// === AUTO START ===
+// Alarmları başlat
+async function startAlarmScanning() {
+    console.log('🚀 Alarm-based scanning başlatılıyor...');
 
-chrome.storage.local.get('autoScan', (data) => {
+    // Mevcut alarmları temizle
+    await chrome.alarms.clearAll();
+
+    // Market tarama: Her 15 saniyede bir (0.25 dakika)
+    // NOT: Chrome minimum 1 dakika zorunlu tutuyor, ama ilk taramayı hemen yapıyoruz
+    chrome.alarms.create(ALARM_NAMES.MARKET_SCAN, {
+        delayInMinutes: 0.5, // 30 saniye sonra ilk alarm
+        periodInMinutes: 0.5 // Her 30 saniyede
+    });
+
+    // Balina tarama: Her 1 dakikada
+    chrome.alarms.create(ALARM_NAMES.WHALE_SCAN, {
+        delayInMinutes: 1,
+        periodInMinutes: 1
+    });
+
+    // Keep alive: Her 1 dakikada
+    chrome.alarms.create(ALARM_NAMES.KEEP_ALIVE, {
+        periodInMinutes: 1
+    });
+
+    scannerEnabled = true;
+
+    // İlk taramayı hemen yap
+    marketScanner.scan();
+
+    // Durumu kaydet
+    await chrome.storage.local.set({ autoScan: true });
+
+    console.log('✅ Alarm-based scanning aktif');
+}
+
+// Alarmları durdur
+async function stopAlarmScanning() {
+    console.log('🛑 Scanning durduruluyor...');
+    await chrome.alarms.clearAll();
+    scannerEnabled = false;
+    await chrome.storage.local.set({ autoScan: false });
+    chrome.action.setBadgeText({ text: '' });
+}
+
+// === AUTO START ON INSTALL/STARTUP ===
+
+chrome.runtime.onInstalled.addListener((details) => {
+    console.log('📦 Extension yüklendi:', details.reason);
+
+    // İlk yüklemede veya güncellemede storage kontrol et
+    chrome.storage.local.get('autoScan', async (data) => {
+        if (data.autoScan) {
+            await startAlarmScanning();
+        }
+    });
+});
+
+chrome.runtime.onStartup.addListener(async () => {
+    console.log('🌅 Chrome başlatıldı, scanner kontrol ediliyor...');
+
+    const data = await chrome.storage.local.get('autoScan');
     if (data.autoScan) {
-        console.log('🔄 Auto-scan aktif, başlatılıyor...');
-        marketScanner.start(10000);
-        whaleScanner.start(60000);
-        scannerEnabled = true;
+        await startAlarmScanning();
     }
 });
 
-console.log('✅ Background service hazır (v2.1 Pro)');
+// İlk yükleme için de kontrol et
+chrome.storage.local.get('autoScan', async (data) => {
+    if (data.autoScan && !scannerEnabled) {
+        console.log('🔄 Auto-scan aktif, başlatılıyor...');
+        await startAlarmScanning();
+    }
+});
+
+console.log('✅ Background service hazır (v3.0 Alarm-Based)');
