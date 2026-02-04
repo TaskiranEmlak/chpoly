@@ -155,7 +155,16 @@ class MarketScanner {
                 }
             }
 
-            if (!endTime || !strikePrice) return null;
+            // Debug: Neden null dönüyor?
+            if (!endTime) {
+                console.log(`❌ ${slug}: endTime bulunamadı`);
+                return null;
+            }
+
+            // strikePrice opsiyonel - yoksa sonra Binance'den alınır
+            if (!strikePrice) {
+                console.log(`⚠️ ${slug}: strikePrice bulunamadı, devam ediliyor`);
+            }
 
             return {
                 id: event.id,
