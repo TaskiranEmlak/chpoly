@@ -1034,7 +1034,21 @@ async function updateNewsSection(market) {
   }
 
   try {
-    const coin = market.coin || (market.title?.toLowerCase().includes('btc') ? 'BTC' : 'ETH');
+    // Coin tespiti - market.coin, slug, title, url'den çıkar
+    let coin = market.coin;
+    if (!coin) {
+      const searchText = `${market.slug || ''} ${market.title || ''} ${market.url || ''}`.toLowerCase();
+      if (searchText.includes('btc') || searchText.includes('bitcoin')) {
+        coin = 'BTC';
+      } else if (searchText.includes('eth') || searchText.includes('ethereum')) {
+        coin = 'ETH';
+      } else if (searchText.includes('sol') || searchText.includes('solana')) {
+        coin = 'SOL';
+      } else {
+        coin = 'BTC'; // Default
+      }
+    }
+    console.log('📰 Haber coin:', coin, 'Market:', market.slug);
     const summary = await newsSentiment.getSentimentSummary(coin);
 
     // Section'ı göster
