@@ -1317,6 +1317,71 @@ input:checked+.slider:before {
   text-align: center;
 }
 
+/* Arbitrage Section */
+.arbitrage-section {
+  background: var(--bg-card);
+  border-radius: var(--radius-md);
+  padding: var(--space-md);
+  margin-top: var(--space-md);
+  border: 1px solid var(--border);
+}
+
+.arbitrage-content {
+  margin-top: var(--space-sm);
+}
+
+.arbitrage-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: var(--space-xs) 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.arbitrage-row:last-of-type {
+  border-bottom: none;
+}
+
+.arbitrage-label {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.arbitrage-value {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.arbitrage-value.positive {
+  color: var(--success);
+}
+
+.arbitrage-value.negative {
+  color: var(--danger);
+}
+
+.arbitrage-signal {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  padding: var(--space-sm);
+  margin-top: var(--space-sm);
+  background: linear-gradient(135deg, rgba(16, 185, 129, 0.15), rgba(59, 130, 246, 0.15));
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--success);
+}
+
+.arb-signal-icon {
+  font-size: 16px;
+}
+
+.arb-signal-text {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
 /* Utilities */
 .hidden {
   display: none !important;

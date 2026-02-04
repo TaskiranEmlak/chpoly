@@ -8,6 +8,8 @@ console.log('🚀 Polymarket AI Background Service Worker v2 başlatıldı');
 // State
 let scannerEnabled = false;
 let marketScanner = null;
+let whaleScanner = null;
+let arbitrageScanner = null;
 let notificationManager = null;
 
 // === MARKET SCANNER ===
@@ -388,7 +390,8 @@ class WhaleScanner {
 // === INITIALIZE ===
 
 marketScanner = new MarketScanner();
-whaleScanner = new WhaleScanner(); // Yeni scanner
+whaleScanner = new WhaleScanner();
+arbitrageScanner = new ArbitrageScanner();
 notificationManager = new NotificationManager();
 
 marketScanner.onSignal = (signal) => {

@@ -128,6 +128,14 @@ function initElements() {
   elements.quickTradeSection = document.getElementById('quickTradeSection');
   elements.quickTradeYes = document.getElementById('quickTradeYes');
   elements.quickTradeNo = document.getElementById('quickTradeNo');
+
+  // Arbitrage
+  elements.arbitrageSection = document.getElementById('arbitrageSection');
+  elements.arbBinancePrice = document.getElementById('arbBinancePrice');
+  elements.arbStrikePrice = document.getElementById('arbStrikePrice');
+  elements.arbDiff = document.getElementById('arbDiff');
+  elements.arbSignal = document.getElementById('arbSignal');
+  elements.arbSignalText = document.getElementById('arbSignalText');
 }
 
 function initAnalyzers() {
@@ -372,6 +380,12 @@ async function handleAnalyze() {
     }
 
     showResult(currentMarket, analysisResult, traderSignals, liquidityData);
+
+    // Arbitraj analizi (kripto için)
+    if (currentMarket.type === 'crypto') {
+      updateArbitrageSection(currentMarket);
+    }
+
     await saveToHistory(currentMarket, analysisResult);
 
     setStatus('Hazır');
@@ -918,5 +932,64 @@ async function clearHistory() {
     await chrome.storage.local.remove(['analysisHistory']);
     renderHistory();
     updatePnlDashboard();
+  }
+}
+
+/**
+ * Arbitraj Section Güncelleme
+ * Market kripto ise Binance ile karşılaştırır
+ */
+async function updateArbitrageSection(market) {
+  if (!market || market.type !== 'crypto' || !market.strikePrice) {
+    elements.arbitrageSection?.classList.add('hidden');
+    return;
+  }
+
+  try {
+    const symbol = market.coin === 'ETH' ? 'ETHUSDT' : 'BTCUSDT';
+    const response = await fetch(`https://api.binance.com/api/v3/ticker/price?symbol=${symbol}`);
+
+    if (!response.ok) {
+      elements.arbitrageSection?.classList.add('hidden');
+      return;
+    }
+
+    const data = await response.json();
+    const binancePrice = parseFloat(data.price);
+    const strikePrice = market.strikePrice;
+
+    // Fark hesapla
+    const diffPercent = ((binancePrice - strikePrice) / strikePrice) * 100;
+
+    // UI güncelle
+    elements.arbitrageSection?.classList.remove('hidden');
+
+    if (elements.arbBinancePrice) {
+      elements.arbBinancePrice.textContent = `$${binancePrice.toLocaleString()}`;
+    }
+
+    if (elements.arbStrikePrice) {
+      elements.arbStrikePrice.textContent = `$${strikePrice.toLocaleString()}`;
+    }
+
+    if (elements.arbDiff) {
+      elements.arbDiff.textContent = `${diffPercent > 0 ? '+' : ''}${diffPercent.toFixed(2)}%`;
+      elements.arbDiff.className = 'arbitrage-value ' + (diffPercent > 0 ? 'positive' : 'negative');
+    }
+
+    // Arbitraj sinyali göster (fark %0.3+ ise)
+    if (Math.abs(diffPercent) >= 0.3) {
+      const suggestedAction = diffPercent > 0 ? 'YES şansı yüksek' : 'NO şansı yüksek';
+      elements.arbSignal?.classList.remove('hidden');
+      if (elements.arbSignalText) {
+        elements.arbSignalText.textContent = `Binance ${diffPercent > 0 ? 'yukarıda' : 'aşağıda'}: ${suggestedAction}`;
+      }
+    } else {
+      elements.arbSignal?.classList.add('hidden');
+    }
+
+  } catch (error) {
+    console.error('Arbitrage update error:', error);
+    elements.arbitrageSection?.classList.add('hidden');
   }
 }
