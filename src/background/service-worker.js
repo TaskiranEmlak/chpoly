@@ -207,14 +207,26 @@ class MarketScanner {
         const timeMinutes = timeRemaining / 60000;
 
         // Geçersiz veya bitmiş market
-        if (timeRemaining <= 0) return;
+        if (timeRemaining <= 0) {
+            console.log(`⏭️ ${market.coin}: Market bitti`);
+            return;
+        }
 
         // Fiyat al
         const currentPrice = await this.getCurrentPrice(market.binanceSymbol);
-        if (!currentPrice) return;
+        if (!currentPrice) {
+            console.log(`❌ ${market.coin}: Fiyat alınamadı`);
+            return;
+        }
 
         // Fiyat geçmişine ekle
         this.recordPrice(market.id, currentPrice);
+
+        // strikePrice kontrolü
+        if (!market.strikePrice) {
+            console.log(`⚠️ ${market.coin}: Strike price yok, atlanıyor`);
+            return;
+        }
 
         const gapPercent = ((currentPrice - market.strikePrice) / market.strikePrice) * 100;
 
@@ -226,11 +238,20 @@ class MarketScanner {
         // Sinyal hesapla
         const signal = this.calculateSmartSignal(market, currentPrice, gapPercent, timeSeconds, trend);
 
-        if (signal && this.onSignal) {
-            // Sinyal lock kontrolü
-            if (this.canSendSignal(market.id, signal.action)) {
-                this.lockSignal(market.id, signal.action, signal.confidence);
-                this.onSignal(signal);
+        if (signal) {
+            console.log(`🎯 Sinyal hesaplandı: ${signal.action} ${signal.confidence}%`);
+
+            if (this.onSignal) {
+                // Sinyal lock kontrolü
+                if (this.canSendSignal(market.id, signal.action)) {
+                    this.lockSignal(market.id, signal.action, signal.confidence);
+                    console.log(`🚨 SİNYAL GÖNDERİLİYOR: ${signal.action}`);
+                    this.onSignal(signal);
+                } else {
+                    console.log(`🔒 Sinyal kilitli - aynı yönde yakın zamanda gönderildi`);
+                }
+            } else {
+                console.log(`⚠️ onSignal callback tanımlı değil`);
             }
         }
     }
@@ -582,12 +603,18 @@ marketScanner.onSignal = (signal) => {
     console.log('🚨 SİNYAL:', signal);
     notificationManager.sendSignal(signal);
 
-    // Storage'a kaydet
+    // Storage'a kaydet - hem history hem lastSignal
     chrome.storage.local.get('signalHistory', (data) => {
         const history = data.signalHistory || [];
         history.unshift(signal);
         if (history.length > 50) history.length = 50;
-        chrome.storage.local.set({ signalHistory: history });
+
+        // Hem history hem lastSignal güncelle
+        chrome.storage.local.set({
+            signalHistory: history,
+            lastSignal: signal,
+            lastSignalUrl: signal.market?.url || ''
+        });
     });
 };
 
